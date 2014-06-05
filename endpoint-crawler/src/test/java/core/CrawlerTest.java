@@ -3,8 +3,7 @@ package core;
 import static core.IsModel.modelOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
-
-import java.util.Set;
+import lombok.val;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -24,6 +23,8 @@ public class CrawlerTest {
 	
 	private Model endpointMock;
 	private Crawler sut;
+
+	private static final String NS = "http://www.example.org/";
 	
 	private static final Resource a = createResource("a");
 	private static final Resource b = createResource("b");
@@ -32,6 +33,7 @@ public class CrawlerTest {
 	
 	private static final Resource i = createResource("i");
 	private static final Resource j = createResource("j");
+	private static final Resource k = createResource("k");
 	
 	private static final Resource x = createResource("x");
 	private static final Resource y = createResource("y");
@@ -39,19 +41,22 @@ public class CrawlerTest {
 	
 	private static final Property p = createProperty("p");
 	private static final Property q = createProperty("q");
+	private static final Property r = createProperty("r");
+	private static final Property s = createProperty("s");
 	
 	@Before
 	public void setUp() {
 		endpointMock = ModelFactory.createDefaultModel();
-		sut = new Crawler("") {
+		sut = new Crawler("mock of endpoint") {
 			@Override
 			public QueryExecution createQuery(String query) {
-				return QueryExecutionFactory.create(query, endpointMock);
+				super.createQuery(query);
+				return QueryExecutionFactory.create(
+						insertPrefixList(query), endpointMock);
 			}
 		};
 	}
-	
-	private static final String NS = "http://www.example.org/";
+
 	private static Resource createResource(String str) {
 		return ResourceFactory.createResource( NS + str );
 	}
@@ -64,10 +69,11 @@ public class CrawlerTest {
 	public void listInstanceOf() throws Exception {
 		endpointMock.add(c, RDFS.subClassOf, d);
 		endpointMock.add(i, RDF.type, c);
-		endpointMock.add(j, RDF.type, d);
+		endpointMock.add(j, RDF.type, c);
+		endpointMock.add(k, RDF.type, d);
 
-		Set<Resource> expected = Sets.newHashSet(i, j);
-		
+		val expected = Sets.newHashSet(i, j, k);
+
 		assertThat( sut.listInstanceOf(d), is(expected) );
 	}
 
@@ -77,7 +83,7 @@ public class CrawlerTest {
 		endpointMock.add(b, p, c);
 		endpointMock.add(c, p, d);
 		
-		Model expected = ModelFactory.createDefaultModel();
+		val expected = ModelFactory.createDefaultModel();
 		expected.add(a, p, b);
 		expected.add(b, p, c);
 		
@@ -92,9 +98,8 @@ public class CrawlerTest {
 		endpointMock.add(x, q, y);
 		endpointMock.add(y, q, z);
 		
-		Set<Resource> subjects = Sets.newHashSet(a, x);
-		
-		Model expected = ModelFactory.createDefaultModel();
+		val subjects = Sets.newHashSet(a, x);
+		val expected = ModelFactory.createDefaultModel();
 		expected.add(a, p, b);
 		expected.add(b, p, c);
 		expected.add(x, q, y);
@@ -103,5 +108,38 @@ public class CrawlerTest {
 		assertThat( sut.tracePropertyPath(subjects, 2), is(modelOf(expected)) );
 	}
 
+	@Test
+	public void existsResource() throws Exception {
+		endpointMock.add(a, p, b);
+				
+		assertThat( sut.exists(a), is(true) );
+		assertThat( sut.exists(p), is(true) );
+		assertThat( sut.exists(b), is(true) );
+		assertThat( sut.exists(x), is(false) );
+	}
+	
+	@Test
+	public void listProperty() throws Exception {
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, b);
+		model.add(c, q, d);
+		
+		val expected = Sets.newHashSet(p, q);
+		
+		assertThat( sut.listProperty(model), is(expected) );
+	}
+	
+	@Test
+	public void listPropertyInfo_getSuperProperties() throws Exception {
+		endpointMock.add(p, RDFS.subPropertyOf, q);
+		endpointMock.add(q, RDFS.subPropertyOf, r);
+		endpointMock.add(r, RDFS.subPropertyOf, s);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(q, RDFS.subPropertyOf, r);
+		expected.add(r, RDFS.subPropertyOf, s);
+		
+		assertThat( sut.inferSuperProperty(q), is(modelOf(expected)) );
+	}
 	
 }
