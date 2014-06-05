@@ -142,4 +142,17 @@ public class CrawlerTest {
 		assertThat( sut.inferSuperProperty(q), is(modelOf(expected)) );
 	}
 	
+	@Test
+	public void listPropertyInfo() {
+		val model = ModelFactory.createDefaultModel();
+		model.add(p, RDFS.subPropertyOf, q);
+		model.add(r, RDFS.domain, c);
+		model.add(s, RDFS.range, c);
+		
+		val expected = Sets.newHashSet(
+				p, q, r, s, RDFS.subPropertyOf, RDFS.domain, RDFS.range);
+		
+		assertThat( sut.listProperty(model), is(expected) );
+	}
+	
 }

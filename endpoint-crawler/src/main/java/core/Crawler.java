@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.google.common.annotations.VisibleForTesting;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
+import com.hp.hpl.jena.query.ResultSetFormatter;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
@@ -40,6 +41,15 @@ public class Crawler {
 		val withPrefix = insertPrefixList(query);
 		
 		return QueryExecutionFactory.sparqlService(endpointURL, withPrefix);
+	}
+	
+	@VisibleForTesting
+	public QueryExecution createQuery(String query, Model model) {
+		log.trace(query);
+		
+		val withPrefix = insertPrefixList(query);
+		
+		return QueryExecutionFactory.create(withPrefix, model);
 	}
 	
 	private Model createEmptyModel() {
@@ -107,10 +117,23 @@ public class Crawler {
 		return createQuery(query).execAsk();
 	}
 
-	public Set<Property> listProperty(Model model) {
-		return model.listStatements().toSet().stream()
-		.map    ( stmt -> stmt.getPredicate() )
-		.collect( Collectors.toSet() );
+	public Set<Resource> listProperty(Model model) {
+		val variable = "?p";
+		val query = (
+				"select distinct ?p where { " + 
+				"{ ?s @p ?o . } union " + 
+				"{ @p rdfs:subPropertyOf ?x . } union " + 
+				"{ ?x rdfs:subPropertyOf @p . } union " + 
+				"{ @p rdfs:domain ?x . } union " + 
+				"{ @p rdfs:range ?x . } " +
+				"}").replace("@p", variable);
+
+		val result = createQuery(query, model).execSelect();
+		val solutions = ResultSetFormatter.toList(result);
+		
+		return solutions.stream()
+				.map( sol -> sol.getResource(variable) )
+				.collect( Collectors.toSet() );
 	}
 
 	public Model inferSuperProperty(Resource property) {
