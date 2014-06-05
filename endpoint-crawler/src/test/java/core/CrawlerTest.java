@@ -119,17 +119,6 @@ public class CrawlerTest {
 	}
 	
 	@Test
-	public void listProperty() throws Exception {
-		val model = ModelFactory.createDefaultModel();
-		model.add(a, p, b);
-		model.add(c, q, d);
-		
-		val expected = Sets.newHashSet(p, q);
-		
-		assertThat( sut.listProperty(model), is(expected) );
-	}
-	
-	@Test
 	public void listPropertyInfo_getSuperProperties() throws Exception {
 		endpointMock.add(p, RDFS.subPropertyOf, q);
 		endpointMock.add(q, RDFS.subPropertyOf, r);
@@ -140,19 +129,6 @@ public class CrawlerTest {
 		expected.add(r, RDFS.subPropertyOf, s);
 		
 		assertThat( sut.inferSuperProperty(q), is(modelOf(expected)) );
-	}
-	
-	@Test
-	public void listPropertyInfo() {
-		val model = ModelFactory.createDefaultModel();
-		model.add(p, RDFS.subPropertyOf, q);
-		model.add(r, RDFS.domain, c);
-		model.add(s, RDFS.range, c);
-		
-		val expected = Sets.newHashSet(
-				p, q, r, s, RDFS.subPropertyOf, RDFS.domain, RDFS.range);
-		
-		assertThat( sut.listProperty(model), is(expected) );
 	}
 	
 }
