@@ -3,6 +3,9 @@ package core;
 import lombok.val;
 import lombok.extern.slf4j.Slf4j;
 
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+
 @Slf4j
 public class Main {
 	
@@ -16,18 +19,27 @@ public class Main {
 	}
 	
 	public static void main(String[] args) {
-		val fragment = EndPointFragment.fromDBPedia();
-		val clazz = "http://dbpedia.org/ontology/SpaceShuttle";
-		val depth = 3;
-		val dir = "/home/tac/";
-		
-		val outputFile = dir + shortenURI(clazz) + "_dep" + depth + ".ttl";
+		PropertiesConfiguration config;
+		try {
+			config = new PropertiesConfiguration("crawler.properties");
 
-		fragment.expand( clazz, depth );
-		log.info( "finish crawling." );
-		
-		fragment.output( outputFile );
-		log.info( "finish output to {}", outputFile );
+			val fragment = EndPointFragment.fromDBPedia();
+			val clazz = config.getString("class");
+			val depth = config.getInt("depth");
+			val outdir = config.getString("outdir");
+
+			val outputFile = outdir + shortenURI(clazz) + "_dep" + depth + ".ttl";
+
+			fragment.expand( clazz, depth );
+			log.info( "finish crawling." );
+			
+			fragment.output( outputFile );
+			log.info( "finish output to {}", outputFile );
+			
+		} catch (ConfigurationException e) {
+			e.printStackTrace();
+		}
+
 	}
 	
 }
