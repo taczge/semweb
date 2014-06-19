@@ -2,13 +2,12 @@ package core;
 
 import static core.IsModel.modelOf;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.*;
 import lombok.val;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import com.google.common.collect.Sets;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.rdf.model.Model;
@@ -39,8 +38,6 @@ public class CrawlerTest {
 	private static final Resource k = createResource("k");
 	
 	private static final Resource x = createResource("x");
-	private static final Resource y = createResource("y");
-	private static final Resource z = createResource("z");
 	
 	private static final Property p = createProperty("p");
 	private static final Property q = createProperty("q");
@@ -69,15 +66,17 @@ public class CrawlerTest {
 	}
 
 	@Test
-	public void listInstanceOf() throws Exception {
+	public void listInstanceOf_getDirectInstances() throws Exception {
 		endpointMock.add(c, RDFS.subClassOf, d);
 		endpointMock.add(i, RDF.type, c);
 		endpointMock.add(j, RDF.type, c);
 		endpointMock.add(k, RDF.type, d);
 
-		val expected = Sets.newHashSet(i, j, k);
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(i, RDF.type, c);
+		expected.add(j, RDF.type, c);
 
-		assertThat( sut.listInstanceOf(d), is(expected) );
+		assertThat( sut.listInstanceOf(c), is(modelOf(expected)) );
 	}
 
 	@Test
@@ -94,25 +93,7 @@ public class CrawlerTest {
 	}
 
 	@Test
-	public void tracePropertyPath() throws Exception {
-		endpointMock.add(a, p, b);
-		endpointMock.add(b, p, c);
-		endpointMock.add(c, p, d);
-		endpointMock.add(x, q, y);
-		endpointMock.add(y, q, z);
-		
-		val subjects = Sets.newHashSet(a, x);
-		val expected = ModelFactory.createDefaultModel();
-		expected.add(a, p, b);
-		expected.add(b, p, c);
-		expected.add(x, q, y);
-		expected.add(y, q, z);
-		
-		assertThat( sut.tracePropertyPath(subjects, 2), is(modelOf(expected)) );
-	}
-
-	@Test
-	public void existsResource() throws Exception {
+	public void exists() throws Exception {
 		endpointMock.add(a, p, b);
 				
 		assertThat( sut.exists(a), is(true) );
@@ -147,7 +128,7 @@ public class CrawlerTest {
 		expected.add(p, RDFS.subPropertyOf, q);
 		expected.add(q, RDFS.subPropertyOf, r);
 
-		assertThat( sut.listPropertyInfo(model), is(modelOf(expected)) ); 
+		assertThat( sut.extractPropertyInfo(model), is(modelOf(expected)) ); 
 	}
 
 	@Test
@@ -164,7 +145,7 @@ public class CrawlerTest {
 		expected.add(c, RDFS.subClassOf, d);
 		expected.add(d, RDFS.subClassOf, e);
 
-		assertThat( sut.listPropertyInfo(model), is(modelOf(expected)) ); 
+		assertThat( sut.extractPropertyInfo(model), is(modelOf(expected)) ); 
 	}
 
 	@Test
@@ -181,7 +162,7 @@ public class CrawlerTest {
 		expected.add(c, RDFS.subClassOf, d);
 		expected.add(d, RDFS.subClassOf, e);
 
-		assertThat( sut.listPropertyInfo(model), is(modelOf(expected)) ); 
+		assertThat( sut.extractPropertyInfo(model), is(modelOf(expected)) ); 
 	}
 
 	@Test
@@ -216,5 +197,132 @@ public class CrawlerTest {
 		expected.add(d, RDFS.subClassOf, e);
 
 		assertThat( sut.inferRangeOf(p), is(modelOf(expected)) ); 
+	}
+	
+	@Test
+	public void tracePathReversely() throws Exception {
+		endpointMock.add(a, p, b);
+		endpointMock.add(b, p, c);
+		endpointMock.add(c, p, d);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(a, p, b);
+		expected.add(b, p, c);
+		expected.add(c, p, d);
+		
+		assertThat( sut.tracePathReversely(p, d), is(modelOf(expected)) );
+	}
+	
+	@Test
+	public void extractClassInfo() throws Exception {
+		endpointMock.add(a, RDFS.subClassOf, b);
+		endpointMock.add(b, RDFS.subClassOf, c);
+		endpointMock.add(i, RDF.type, a);
+		endpointMock.add(j, RDF.type, b);
+		endpointMock.add(k, RDF.type, c);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(a, RDFS.subClassOf, b);
+		expected.add(b, RDFS.subClassOf, c);
+		expected.add(i, RDF.type, a);
+		expected.add(j, RDF.type, b);
+		expected.add(k, RDF.type, c);
+
+		assertThat( sut.extractClassInfo(c), is(modelOf(expected)) );
+	}
+	
+	@Test
+	public void extractPropertyPath() throws Exception {
+		endpointMock.add(a, p, b);
+		endpointMock.add(b, q, c);
+		endpointMock.add(d, r, e);
+
+		endpointMock.add(f, s, f);
+		
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, d);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(a, p, b);
+		expected.add(b, q, c);
+		expected.add(d, r, e);
+		
+		assertThat( sut.extractPropertyPath(model, 3), is(modelOf(expected)) );
+	}
+	
+	@Test
+	public void extractPropertyInfo_getSuperProperty() throws Exception {
+		endpointMock.add(a, p, b);
+		endpointMock.add(p, RDFS.subPropertyOf, q);
+		endpointMock.add(q, RDFS.subPropertyOf, r);
+		
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, b);
+
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.subPropertyOf, q);
+		expected.add(q, RDFS.subPropertyOf, r);
+
+		assertThat( sut.extractPropertyInfo(model), is(modelOf(expected)) );
+	}
+	
+	@Test
+	public void extractPropertyInfo_getSubProperty() throws Exception {
+		endpointMock.add(a, r, b);
+		endpointMock.add(p, RDFS.subPropertyOf, q);
+		endpointMock.add(q, RDFS.subPropertyOf, r);
+		
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, r, b);
+
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.subPropertyOf, q);
+		expected.add(q, RDFS.subPropertyOf, r);
+
+		assertThat( sut.extractPropertyInfo(model), is(modelOf(expected)) );
+	}
+	
+	@Test
+	public void extractPropertyInfo_getDomain() throws Exception {
+		endpointMock.add(a, p, b);
+		endpointMock.add(p, RDFS.domain, c);
+		endpointMock.add(c, RDFS.subClassOf, d);
+		
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, b);
+
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.domain, c);
+		expected.add(c, RDFS.subClassOf, d);
+
+		assertThat( sut.extractPropertyInfo(model), is(modelOf(expected)) );
+		
+	}
+
+	@Test
+	public void extractPropertyInfo_getRange() throws Exception {
+		endpointMock.add(a, p, b);
+		endpointMock.add(p, RDFS.range, c);
+		endpointMock.add(c, RDFS.subClassOf, d);
+		
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, b);
+
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.range, c);
+		expected.add(c, RDFS.subClassOf, d);
+
+		assertThat( sut.extractPropertyInfo(model), is(modelOf(expected)) );
+		
+	}
+
+	@Test
+	public void extractClassInfo_getInstanceOfGivenClass() throws Exception {
+		endpointMock.add(i, RDF.type, c);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(i, RDF.type, c);
+		
+		assertThat( sut.extractClassInfo(c), is(modelOf(expected)) );
 	}
 }

@@ -4,7 +4,6 @@ import java.io.FileWriter;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.NonNull;
 import lombok.ToString;
 import lombok.val;
 
@@ -18,17 +17,14 @@ import com.hp.hpl.jena.rdf.model.ResourceFactory;
 @ToString
 public class EndPointFragment {
 
-	@NonNull private final Model model;
-	@NonNull private final Crawler crawler;
+	private final Model model;
+	private final Crawler crawler;
 	
 	public static EndPointFragment fromDBPedia() {
-		return EndPointFragment.of( Crawler.DBPEDIA );
-	}
-	
-	public static EndPointFragment of(Crawler crawler) {
-		val m  = ModelFactory.createDefaultModel();
-		
-		return new EndPointFragment(m, crawler);
+		val model   = ModelFactory.createDefaultModel();
+		val crawler = Crawler.DBPEDIA;
+
+		return new EndPointFragment( model, crawler ); 
 	}
 	
 	public void expand(String clazz, int depth) {
@@ -37,11 +33,10 @@ public class EndPointFragment {
 		expand(c, depth);
 	}
 	
-	public void expand(Resource clazz, int depth) {
-		val instances = crawler.listInstanceOf(clazz);
-		val fragment  = crawler.tracePropertyPath(instances, depth);
-
-		model.add(fragment);
+	private void expand(Resource clazz, int depth) {
+		model.add( crawler.extractClassInfo(clazz) );
+		model.add( crawler.extractPropertyPath(model, depth) );
+		model.add( crawler.extractPropertyInfo(model) );
 	}
 	
 	public void output(String fileName) {
