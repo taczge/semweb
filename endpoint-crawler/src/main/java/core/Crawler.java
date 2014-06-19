@@ -3,6 +3,8 @@ package core;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.AllArgsConstructor;
 import lombok.val;
@@ -13,7 +15,9 @@ import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
+import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
+import com.hp.hpl.jena.vocabulary.RDFS;
 
 @AllArgsConstructor
 @Slf4j
@@ -104,21 +108,68 @@ public class Crawler {
 		return createQuery(query).execAsk();
 	}
 
-	public Model inferSuperProperty(Resource property) {
-		log.debug("infer super-property of {}", property);
-
-		val query = ("construct { @p rdfs:subPropertyOf ?super . } "
-				+ "where { @p rdfs:subPropertyOf ?super . }").replace("@p",
-				normalize(property));
+	public Model inferSuperPropertyOf(Resource subProperty) {
+		return tracePathRecursive(subProperty, RDFS.subPropertyOf);
+	}
+	
+	public Model inferSuperClassOf(Resource subClass) {
+		return tracePathRecursive(subClass, RDFS.subClassOf);
+	}
+	
+	public Model tracePathRecursive(Resource base, Property property) {
+		val query =
+				"construct { @s @p ?o . } where { @s @p ?o . }"
+				.replace("@s", normalize(base)    )
+				.replace("@p", normalize(property));
 
 		val result = executeAsConstruct(query);
-
 		val rest = result.listObjects().toSet().stream()
-				.filter(o -> o.isURIResource())
-				.map(o -> inferSuperProperty(o.asResource()))
-				.reduce(createEmptyModel(), (a, b) -> a.add(b));
+				.filter( o -> o.isURIResource() )
+				.map   ( o -> tracePathRecursive(o.asResource(), property) )
+				.reduce( createEmptyModel(), (a, b) -> a.add(b) );
 
 		return result.add(rest);
+	}
+	
+	public Model inferDomainOf(Property p) {
+		val query = 
+				"construct { @p rdfs:domain ?c . } where { @p rdfs:domain ?c . }"
+				.replace("@p", normalize(p));
+		val domains = executeAsConstruct(query);
+		val superClasses = domains.listObjects().toSet().stream() 
+				.filter ( o -> o.isURIResource() )
+				.map    ( o -> o.asResource())
+				.map    ( o -> inferSuperClassOf(o) )
+				.reduce ( createEmptyModel(), (a, b) -> a.add(b) );
+		
+		return domains.add(superClasses);
+	}
+	
+	public Model inferRangeOf(Property p) {
+		val query = 
+				"construct { @p rdfs:range ?c . } where { @p rdfs:range ?c . }"
+				.replace("@p", normalize(p));
+		val ranges = executeAsConstruct(query);
+		val superClasses = ranges.listObjects().toSet().stream() 
+				.filter ( o -> o.isURIResource() )
+				.map    ( o -> o.asResource())
+				.map    ( o -> inferSuperClassOf(o) )
+				.reduce ( createEmptyModel(), (a, b) -> a.add(b) );
+		
+		return ranges.add(superClasses);
+	}
+
+	public Model listPropertyInfo(Model model) {
+		val properties = model.listStatements().toSet().stream()
+				.map( stmt -> stmt.getPredicate() )
+				.collect( Collectors.toSet() );
+
+		val hierarchies = properties.stream().map( p -> inferSuperPropertyOf(p) );
+		val domains     = properties.stream().map( p -> inferDomainOf(p) );
+		val ranges      = properties.stream().map( p -> inferRangeOf(p) );
+		val all = Stream.concat(hierarchies, Stream.concat(domains, ranges));
+		
+		return all.reduce(createEmptyModel(), (a, b) -> a.add(b));
 	}
 
 }

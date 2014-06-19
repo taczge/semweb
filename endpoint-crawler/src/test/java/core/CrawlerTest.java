@@ -30,6 +30,9 @@ public class CrawlerTest {
 	private static final Resource b = createResource("b");
 	private static final Resource c = createResource("c");
 	private static final Resource d = createResource("d");
+	private static final Resource e = createResource("e");
+	private static final Resource f = createResource("f");
+	private static final Resource g = createResource("g");
 	
 	private static final Resource i = createResource("i");
 	private static final Resource j = createResource("j");
@@ -119,7 +122,7 @@ public class CrawlerTest {
 	}
 	
 	@Test
-	public void listPropertyInfo_getSuperProperties() throws Exception {
+	public void inferSuperProperty() throws Exception {
 		endpointMock.add(p, RDFS.subPropertyOf, q);
 		endpointMock.add(q, RDFS.subPropertyOf, r);
 		endpointMock.add(r, RDFS.subPropertyOf, s);
@@ -128,7 +131,90 @@ public class CrawlerTest {
 		expected.add(q, RDFS.subPropertyOf, r);
 		expected.add(r, RDFS.subPropertyOf, s);
 		
-		assertThat( sut.inferSuperProperty(q), is(modelOf(expected)) );
+		assertThat( sut.inferSuperPropertyOf(q), is(modelOf(expected)) );
 	}
 	
+	@Test
+	public void listPropertyInfo_inferSuperProperties() throws Exception {
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, b);
+		
+		endpointMock.add(p, RDFS.subPropertyOf, q);
+		endpointMock.add(q, RDFS.subPropertyOf, r);
+		endpointMock.add(s, RDFS.subPropertyOf, r);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.subPropertyOf, q);
+		expected.add(q, RDFS.subPropertyOf, r);
+
+		assertThat( sut.listPropertyInfo(model), is(modelOf(expected)) ); 
+	}
+
+	@Test
+	public void listPropertyInfo_inferDomains() throws Exception {
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, b);
+		
+		endpointMock.add(p, RDFS.domain, c);
+		endpointMock.add(c, RDFS.subClassOf, d);
+		endpointMock.add(d, RDFS.subClassOf, e);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.domain, c);
+		expected.add(c, RDFS.subClassOf, d);
+		expected.add(d, RDFS.subClassOf, e);
+
+		assertThat( sut.listPropertyInfo(model), is(modelOf(expected)) ); 
+	}
+
+	@Test
+	public void listPropertyInfo_inferRanges() throws Exception {
+		val model = ModelFactory.createDefaultModel();
+		model.add(a, p, b);
+		
+		endpointMock.add(p, RDFS.range, c);
+		endpointMock.add(c, RDFS.subClassOf, d);
+		endpointMock.add(d, RDFS.subClassOf, e);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.range, c);
+		expected.add(c, RDFS.subClassOf, d);
+		expected.add(d, RDFS.subClassOf, e);
+
+		assertThat( sut.listPropertyInfo(model), is(modelOf(expected)) ); 
+	}
+
+	@Test
+	public void inferDomainOf() throws Exception {
+		endpointMock.add(p, RDFS.domain, c);
+		endpointMock.add(c, RDFS.subClassOf, d);
+		endpointMock.add(d, RDFS.subClassOf, e);
+		endpointMock.add(p, RDFS.domain, f);
+		endpointMock.add(q, RDFS.domain, g);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.domain, c);
+		expected.add(p, RDFS.domain, f);
+		expected.add(c, RDFS.subClassOf, d);
+		expected.add(d, RDFS.subClassOf, e);
+
+		assertThat( sut.inferDomainOf(p), is(modelOf(expected)) ); 
+	}
+	
+	@Test
+	public void inferRangeOf() throws Exception {
+		endpointMock.add(p, RDFS.range, c);
+		endpointMock.add(c, RDFS.subClassOf, d);
+		endpointMock.add(d, RDFS.subClassOf, e);
+		endpointMock.add(p, RDFS.range, f);
+		endpointMock.add(q, RDFS.range, g);
+		
+		val expected = ModelFactory.createDefaultModel();
+		expected.add(p, RDFS.range, c);
+		expected.add(p, RDFS.range, f);
+		expected.add(c, RDFS.subClassOf, d);
+		expected.add(d, RDFS.subClassOf, e);
+
+		assertThat( sut.inferRangeOf(p), is(modelOf(expected)) ); 
+	}
 }
