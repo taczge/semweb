@@ -2,7 +2,7 @@ package core;
 
 import static core.IsModel.modelOf;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 import lombok.val;
 
 import org.junit.Before;
@@ -23,7 +23,7 @@ public class CrawlerTest {
 	private Model endpointMock;
 	private Crawler sut;
 
-	private static final String NS = "http://www.example.org/";
+	private static final String NAME_SPACE = "http://www.example.org/";
 	
 	private static final Resource a = createResource("a");
 	private static final Resource b = createResource("b");
@@ -58,11 +58,11 @@ public class CrawlerTest {
 	}
 
 	private static Resource createResource(String str) {
-		return ResourceFactory.createResource( NS + str );
+		return ResourceFactory.createResource( NAME_SPACE + str );
 	}
 	
 	private static Property createProperty(String str) {
-		return ResourceFactory.createProperty( NS + str );
+		return ResourceFactory.createProperty( NAME_SPACE + str );
 	}
 
 	@Test
@@ -325,4 +325,23 @@ public class CrawlerTest {
 		
 		assertThat( sut.extractClassInfo(c), is(modelOf(expected)) );
 	}
+
+	@Test
+	public void listDirectPathFrom_notReturnLiteral() throws Exception {
+		endpointMock.add(a, p, "literal");
+		val expected = ModelFactory.createDefaultModel();
+		
+		assertThat( sut.listDirectPathFrom(a), is(modelOf(expected)) );
+	}
+	
+	@Test
+	public void listDirectPathFrom_notReturnBlankNode() throws Exception {
+		val blank = endpointMock.createResource();
+		endpointMock.add(a, p, blank);
+
+		val expected = ModelFactory.createDefaultModel();
+		
+		assertThat( sut.listDirectPathFrom(a), is(modelOf(expected)) );
+	}
+
 }

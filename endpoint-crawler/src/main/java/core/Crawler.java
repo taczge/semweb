@@ -146,7 +146,7 @@ public class Crawler {
 	}
 	
 	public Model listDirectPathFrom(Resource subject) {
-		val query = "construct { @s ?p ?o . } where { @s ?p ?o . }"
+		val query = "construct { @s ?p ?o . } where { @s ?p ?o . filter(isURI(?o)) }"
 				.replace("@s", normalize(subject));
 
 		return createQuery(query).execConstruct();
@@ -164,6 +164,7 @@ public class Crawler {
 		return tracePath(subClass, RDFS.subClassOf);
 	}
 	
+	// subClass, subProperty の検索だけで使うので，filter(isURI(?o)) は(今のところ)必要ない
 	public Model tracePath(Resource base, Property property) {
 		val query =
 				"construct { @s @p ?o . } where { @s @p ?o . }"
@@ -180,6 +181,7 @@ public class Crawler {
 		return result.add(rest);
 	}
 	
+	// subClass, subProperty の検索だけで使うので，filter(isURI(?o)) は(今のところ)必要ない
 	public Model tracePathReversely(Property property, Resource base) { 
 		val query = "construct { ?s @p @o . } where { ?s @p @o . }"
 				.replace("@p", normalize(property))

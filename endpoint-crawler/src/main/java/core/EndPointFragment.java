@@ -24,7 +24,7 @@ public class EndPointFragment {
 		val model   = ModelFactory.createDefaultModel();
 		val crawler = Crawler.DBPEDIA;
 
-		return new EndPointFragment( model, crawler ); 
+		return new EndPointFragment( model, crawler );
 	}
 	
 	public void expand(String clazz, int depth) {
