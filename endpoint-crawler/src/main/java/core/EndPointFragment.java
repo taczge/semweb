@@ -17,7 +17,7 @@ import com.hp.hpl.jena.rdf.model.ResourceFactory;
 @ToString
 public class EndPointFragment {
 
-	private final Model model;
+	private final Model   model;
 	private final Crawler crawler;
 	
 	public static EndPointFragment fromDBPedia() {
@@ -40,20 +40,10 @@ public class EndPointFragment {
 	}
 	
 	public void output(String fileName) {
-		FileWriter out = null;
-		try {
-			out = new FileWriter( fileName );
+		try ( FileWriter out = new FileWriter(fileName) ) {
 			model.write( out, "TTL" );
 		} catch (Exception e) {
 			e.printStackTrace();
-		} finally {
-			if (out != null) {
-				try {
-					out.close();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
 		}
 	}
 }
