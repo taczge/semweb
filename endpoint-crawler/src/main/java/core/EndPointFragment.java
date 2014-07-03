@@ -20,9 +20,9 @@ public class EndPointFragment {
 	private final Model   model;
 	private final Crawler crawler;
 	
-	public static EndPointFragment fromDBPedia() {
+	public static EndPointFragment from(String endpointURL) {
 		val model   = ModelFactory.createDefaultModel();
-		val crawler = Crawler.DBPEDIA;
+		val crawler = new Crawler(endpointURL);
 
 		return new EndPointFragment( model, crawler );
 	}

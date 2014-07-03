@@ -28,8 +28,6 @@ public class Crawler {
 	private static final String PREFIX_LIST = ""
 			+ "prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " + LS
 			+ "prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + LS;
-	public static final
-	Crawler DBPEDIA = new Crawler("http://dbpedia.org/sparql");
 
 	private final String endpointURL;
 
