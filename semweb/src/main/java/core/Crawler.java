@@ -2,6 +2,7 @@ package core;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -203,40 +204,39 @@ public class Crawler {
 				.reduce ( ModelFactory.createDefaultModel(), (a, b) -> a.add(b) );
 	}
 	
-	public Model inferDomainOf(Property p) {
-		val query = 
-				"construct { @p rdfs:domain ?c . } where { @p rdfs:domain ?c . }"
-				.replace("@p", normalize(p));
+	public Model inferDomainOf(Resource p) {
+		val query = concat(
+				"CONSTRUCT {",
+				"   @p rdfs:domain ?c",
+				"} WHERE {",
+				"   @p rdfs:domain ?c",
+				"}"
+				).replace("@p", normalize(p));
 		
-		val domains = executeAsConstruct(query);
-		val classes = inferSuperClassOfObjectIn(domains);  
-		
-		return domains.add(classes);
+		return executeAsConstruct(query);
 	}
 	
-	public Model inferRangeOf(Property p) {
-		val query = 
-				"construct { @p rdfs:range ?c . } where { @p rdfs:range ?c . }"
-				.replace("@p", normalize(p));
+	public Model inferRangeOf(Resource p) {
+		val query = concat(
+				"CONSTRUCT {",
+				"   @p rdfs:range ?c",
+				"} WHERE {",
+				"   @p rdfs:range ?c",
+				"}"
+				).replace("@p", normalize(p));
 
-		val ranges  = executeAsConstruct(query);
-		val classes = inferSuperClassOfObjectIn(ranges);
-		
-		return ranges.add(classes);
+		return executeAsConstruct(query);
 	}
 
 	@SuppressWarnings("unchecked")
 	public Model extractPropertyInfo(Model model) {
-		val properties = model.listStatements().toSet().stream()
-				.map( stmt -> stmt.getPredicate() )
-				.collect( Collectors.toSet() );
-
-		val subs        = properties.stream().map( p -> inferSubPropertyOf(p) );
-		val supers      = properties.stream().map( p -> inferSuperPropertyOf(p) );
-		val domains     = properties.stream().map( p -> inferDomainOf(p) );
-		val ranges      = properties.stream().map( p -> inferRangeOf(p) );
+		val properties = listPropertyIn(model);
+		log.info("infer property info for {} properties", properties.size());
 		
-		return toModel(subs, supers, domains, ranges);
+		val domains = properties.stream().map( p -> inferDomainOf(p) );
+		val ranges  = properties.stream().map( p -> inferRangeOf(p) );
+
+		return toModel(domains, ranges);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -245,6 +245,102 @@ public class Crawler {
 				.reduce(Stream.empty(), (a, b) -> Stream.concat(a, b));
 		
 		return all.reduce(ModelFactory.createDefaultModel(), (a, b) -> a.add(b));
+	}
+	
+	private Set<Resource> listPropertyIn(Model model) {
+		val query = concat(
+				PREFIX_LIST,
+				"SELECT DISTINCT ?p {",
+				"   { ?x ?p                 ?y } UNION",
+				"   { ?p rdfs:subPropertyOf ?x } UNION",
+				"   { ?x rdfs:subPropertyOf ?p } UNION",
+				"   { ?p rdfs:domain        ?x } UNION",
+				"   { ?p rdfs:range         ?x }      ",
+
+				"   FILTER(",
+				"      !strstarts( str(?p), str(rdf:)  ) &&",
+				"      !strstarts( str(?p), str(rdfs:) )",
+				"   )",
+				"}"
+				);
+				
+		
+		val results = QueryExecutionFactory.create(query, model).execSelect();
+		
+		val properties = new LinkedList<Resource>();
+		while ( results.hasNext() ) {
+			val p = results.next().getResource("?p");
+			properties.add(p);
+		}
+
+		return new HashSet<>(properties);
+	}
+	
+	public Model inferSuperPropertyIn(Model model) {
+		val properties = listPropertyIn(model);
+		log.info("infer super property for {} properties.", properties.size());
+
+		return properties.stream()
+				.map   ( p -> inferSuperPropertyOf(p) )
+				.reduce( ModelFactory.createDefaultModel(), (a, b) -> a.add(b) );
+	}
+
+	public Model extractTypeIn(Model model) {
+		val instances = listInstanceIn(model);
+		log.info("extract type for {} instances.", instances.size());
+		
+		return instances.stream()
+				.map   ( i -> extractTypeOf(i) )
+				.reduce( ModelFactory.createDefaultModel(), (a, b) -> a.add(b) );
+	}
+	
+	private Model extractTypeOf(Resource instance) {
+		val query = "construct { @i rdf:type ?c } where { @i rdf:type ?c }"
+				.replace("@i", normalize(instance));
+		
+		return executeAsConstruct(query);		
+	}
+	
+	private String concat(String... lines) {
+		val bulider = new StringBuilder();
+		
+		for ( final String l : lines ) {
+			bulider.append(l).append(LS);
+		}
+		
+		return bulider.toString();
+	}
+	
+	private Set<Resource> listClassIn(Model model) {
+		val query = concat(
+				PREFIX_LIST,
+				"SELECT DISTINCT ?c {",
+				"   { ?x rdf:type        ?c } UNION",
+				"   { ?c rdfs:subClassOf ?x } UNION",
+				"   { ?x rdfs:subClassOf ?c } UNION",
+				"   { ?x rdfs:domain     ?c } UNION",
+				"   { ?x rdfs:range      ?c }      ",
+				"}"
+				);
+		
+		val results = QueryExecutionFactory.create(query, model).execSelect();
+		
+		val classes = new LinkedList<Resource>();
+		while ( results.hasNext() ) {
+			val c = results.next().getResource("?c");
+			classes.add(c);
+		}
+
+		return new HashSet<>(classes);
+	}
+	
+	public Model inferSuperClassIn(Model model) {
+		val classes = listClassIn(model);
+		log.info("infer super class for {} classes.", classes.size());
+
+		return classes.stream()
+				.map   ( c -> inferSuperClassOf(c) )
+				.reduce( ModelFactory.createDefaultModel(), (a, b) -> a.add(b) );
 	}
 
 }
