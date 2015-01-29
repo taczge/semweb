@@ -1,13 +1,11 @@
 package core;
 
 import lombok.val;
-import lombok.extern.slf4j.Slf4j;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.log4j.PropertyConfigurator;
 
-@Slf4j
 public class Main {
 	
 	private Main() {}
@@ -17,30 +15,6 @@ public class Main {
 		val maxIndex = tokens.length - 1;
 
 		return tokens[maxIndex]; 
-	}
-	
-	public static void extractFromClass() {
-		PropertiesConfiguration config;
-		try {
-			config = new PropertiesConfiguration("crawler.properties");
-
-			val endpoint = config.getString("endpoint");
-			val clazz = config.getString("class");
-			val depth = config.getInt("depth");
-			val outdir = config.getString("outdir");
-
-			val outputFile = outdir + shortenURI(clazz) + "_dep" + depth + ".ttl";
-
-			val fragment = EndPointFragment.from(endpoint);
-			fragment.expand( clazz, depth );
-			log.info( "finish crawling." );
-			
-			fragment.output( outputFile );
-			log.info( "finish output to {}", outputFile );
-			
-		} catch (ConfigurationException e) {
-			e.printStackTrace();
-		}
 	}
 	
 	public static void extractFromInstance(String filename) {
@@ -79,7 +53,6 @@ public class Main {
 		}
 
 		extractFromInstance("crawler.properties");
-		// extractFromClass();
 	}
 	
 }

@@ -33,10 +33,17 @@ public class Fragment {
 	}
 	
 	private void expand(Resource instance, int depth) {
+		if ( !crawler.exists(instance) ) {
+			log.info("\"{}\" does not exist.", instance);
+			log.info("aborted.");
+
+			return ;
+		}
+
 		log.info("expand({}, {})", instance, depth);
 
 		val stopwatch = Stopwatch.createStarted();
-
+		
 		model.add( crawler.tracePropertyPathFrom(instance, depth) );
 		log.info("finish tracing property path");
 		

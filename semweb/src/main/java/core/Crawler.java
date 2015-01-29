@@ -58,29 +58,6 @@ public class Crawler {
 		return tracePathReversely(RDFS.subClassOf, superClass);
 	}
 	
-	public Model listInstanceOf(Model model) {
-		val subClasses = model.listSubjectsWithProperty(RDFS.subClassOf).toSet();
-		val superClasses = model.listObjectsOfProperty(RDFS.subClassOf).toSet().stream()
-				.filter ( n -> n.isURIResource() )
-				.map    ( n -> n.asResource()    )
-				.collect( Collectors.toSet()     );
-		
-		val classes = new HashSet<Resource>( subClasses.size() + superClasses.size() );
-		classes.addAll( subClasses );
-		classes.addAll( superClasses );
-		
-		return classes.stream()
-				.map( c -> listInstanceOf(c) )
-				.reduce( ModelFactory.createDefaultModel(), (a, b) -> a.add(b) );
-	}
-	
-	public Model listInstanceOf(Resource clazz) {
-		val query = "construct { ?x rdf:type @c . } where { ?x rdf:type @c . }"  
-				.replace("@c", normalize(clazz));
-
-		return executeAsConstruct(query);
-	}
-	
 	public boolean exists(Resource resource) {
 		val query = "ask { { @r ?p ?o. } union { ?s @r ?o . } union {?s ?p @r . } }"
 				.replace("@r", normalize(resource));
@@ -88,28 +65,7 @@ public class Crawler {
 		return createQuery(query).execAsk();
 	}
 
-	public Model extractClassInfo(Resource clazz) {
-		if ( !exists(clazz) ) {
-			log.info("{} does not exist in {}.", normalize(clazz), endpointURL);
-
-			return ModelFactory.createDefaultModel();
-		}
-
-		log.info("{} exists in {}.", normalize(clazz), endpointURL);
-		
-		val classHierarchy   = inferSubClassOf(clazz);
-		val explictInstances = listInstanceOf(clazz);
-		val implictInstances = listInstanceOf(classHierarchy); 
-		
-		val info = ModelFactory.createDefaultModel();
-		info.add(classHierarchy);
-		info.add(explictInstances);
-		info.add(implictInstances);
-
-		return info;
-	}
-	
-	public Set<Resource> listInstanceIn(Model model) {
+	private Set<Resource> listInstanceIn(Model model) {
 		val subjects = model.listSubjects().toSet();
 		val objects  = model.listObjects().toSet().stream()
 				.filter ( o -> o.isURIResource() )
@@ -117,14 +73,6 @@ public class Crawler {
 				.collect( Collectors.toSet()     );
 		
 		return Sets.union(subjects, objects);
-	}
-	
-	public Model extractPropertyPath(Model model, int depth) {
-		val instances = listInstanceIn(model);
-		
-		return instances.stream()
-				.map   ( i -> tracePropertyPathFrom(i, depth) )
-				.reduce( ModelFactory.createDefaultModel(), (a, b) -> a.add(b) );
 	}
 	
 	public Model tracePropertyPathFrom(Resource subject, int depth) {
@@ -144,27 +92,23 @@ public class Crawler {
 		return result.add(rest);
 	}
 	
-	public Model listDirectPathFrom(Resource subject) {
+	private Model listDirectPathFrom(Resource subject) {
 		val query = "construct { @s ?p ?o . } where { @s ?p ?o . filter(isURI(?o)) }"
 				.replace("@s", normalize(subject));
 
 		return createQuery(query).execConstruct();
 	}
 
-	public Model inferSuperPropertyOf(Resource subProperty) {
+	private Model inferSuperPropertyOf(Resource subProperty) {
 		return tracePath(subProperty, RDFS.subPropertyOf);
 	}
 
-	public Model inferSubPropertyOf(Resource superProperty) {
-		return tracePathReversely(RDFS.subPropertyOf, superProperty);
-	}
-
-	public Model inferSuperClassOf(Resource subClass) {
+	private Model inferSuperClassOf(Resource subClass) {
 		return tracePath(subClass, RDFS.subClassOf);
 	}
 	
 	// subClass, subProperty の検索だけで使うので，filter(isURI(?o)) は(今のところ)必要ない
-	public Model tracePath(Resource base, Property property) {
+	private Model tracePath(Resource base, Property property) {
 		val query =
 				"construct { @s @p ?o . } where { @s @p ?o . }"
 				.replace("@s", normalize(base)    )
@@ -181,7 +125,7 @@ public class Crawler {
 	}
 	
 	// subClass, subProperty の検索だけで使うので，filter(isURI(?o)) は(今のところ)必要ない
-	public Model tracePathReversely(Property property, Resource base) { 
+	private Model tracePathReversely(Property property, Resource base) { 
 		val query = "construct { ?s @p @o . } where { ?s @p @o . }"
 				.replace("@p", normalize(property))
 				.replace("@o", normalize(base)    );
@@ -195,16 +139,8 @@ public class Crawler {
 
 		return result.add(rest);
 	}
-		
-	public Model inferSuperClassOfObjectIn(Model model) {
-		return model.listObjects().toSet().stream() 
-				.filter ( o -> o.isURIResource() )
-				.map    ( o -> o.asResource())
-				.map    ( o -> inferSuperClassOf(o) )
-				.reduce ( ModelFactory.createDefaultModel(), (a, b) -> a.add(b) );
-	}
 	
-	public Model inferDomainOf(Resource p) {
+	private Model inferDomainOf(Resource p) {
 		val query = concat(
 				"CONSTRUCT {",
 				"   @p rdfs:domain ?c",
@@ -216,7 +152,7 @@ public class Crawler {
 		return executeAsConstruct(query);
 	}
 	
-	public Model inferRangeOf(Resource p) {
+	private Model inferRangeOf(Resource p) {
 		val query = concat(
 				"CONSTRUCT {",
 				"   @p rdfs:range ?c",
