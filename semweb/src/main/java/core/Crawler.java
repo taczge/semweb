@@ -25,10 +25,21 @@ import com.hp.hpl.jena.vocabulary.RDFS;
 @Slf4j
 public class Crawler {
 
-	private static final String LS = System.lineSeparator();
-	private static final String PREFIX_LIST = ""
-			+ "prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " + LS
-			+ "prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + LS;
+	private static final String PREFIX_LIST = concat(
+			"prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+			"prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ");
+	
+	private static String concat(String... lines) {
+		val bulider = new StringBuilder();
+		val sep = " ";
+
+		for ( final String line : lines ) {
+			val l = line.trim();
+			bulider.append(l).append(sep);
+		}
+		
+		return bulider.toString();
+	}
 
 	private final String endpointURL;
 
@@ -59,8 +70,13 @@ public class Crawler {
 	}
 	
 	public boolean exists(Resource resource) {
-		val query = "ask { { @r ?p ?o. } union { ?s @r ?o . } union {?s ?p @r . } }"
-				.replace("@r", normalize(resource));
+		val query = concat(
+				"ASK {",
+				"     { @r ?p ?o . } UNION",
+				"     { ?s @r ?o . } UNION",
+				"     { ?s ?p @r . }",
+				"}"
+				).replace("@r", normalize(resource));
 
 		return createQuery(query).execAsk();
 	}
@@ -93,8 +109,14 @@ public class Crawler {
 	}
 	
 	private Model listDirectPathFrom(Resource subject) {
-		val query = "construct { @s ?p ?o . } where { @s ?p ?o . filter(isURI(?o)) }"
-				.replace("@s", normalize(subject));
+		val query = concat(
+				"CONSTRUCT {",
+				"     @s ?p ?o .",
+				"} WHERE {",
+				"     @s ?p ?o .",
+				"   FILTER(isURI(?o))",
+				"}"
+				).replace("@s", normalize(subject));
 
 		return createQuery(query).execConstruct();
 	}
@@ -109,9 +131,13 @@ public class Crawler {
 	
 	// subClass, subProperty の検索だけで使うので，filter(isURI(?o)) は(今のところ)必要ない
 	private Model tracePath(Resource base, Property property) {
-		val query =
-				"construct { @s @p ?o . } where { @s @p ?o . }"
-				.replace("@s", normalize(base)    )
+		val query = concat(
+				"CONSTRUCT {",
+				"     @s @p ?o .",
+				"} WHERE {",
+				"     @s @p ?o .",
+				"}")
+				.replace("@s", normalize(base))
 				.replace("@p", normalize(property));
 
 		val result = executeAsConstruct(query);
@@ -126,7 +152,12 @@ public class Crawler {
 	
 	// subClass, subProperty の検索だけで使うので，filter(isURI(?o)) は(今のところ)必要ない
 	private Model tracePathReversely(Property property, Resource base) { 
-		val query = "construct { ?s @p @o . } where { ?s @p @o . }"
+		val query = concat(
+				"CONSTRUCT {",
+				"     ?s @p @o .",
+				"} WHERE {",
+				"     ?s @p @o . ",
+				"}")
 				.replace("@p", normalize(property))
 				.replace("@o", normalize(base)    );
 
@@ -143,9 +174,9 @@ public class Crawler {
 	private Model inferDomainOf(Resource p) {
 		val query = concat(
 				"CONSTRUCT {",
-				"   @p rdfs:domain ?c",
+				"     @p rdfs:domain ?c",
 				"} WHERE {",
-				"   @p rdfs:domain ?c",
+				"     @p rdfs:domain ?c",
 				"}"
 				).replace("@p", normalize(p));
 		
@@ -155,9 +186,9 @@ public class Crawler {
 	private Model inferRangeOf(Resource p) {
 		val query = concat(
 				"CONSTRUCT {",
-				"   @p rdfs:range ?c",
+				"     @p rdfs:range ?c",
 				"} WHERE {",
-				"   @p rdfs:range ?c",
+				"     @p rdfs:range ?c",
 				"}"
 				).replace("@p", normalize(p));
 
@@ -187,19 +218,18 @@ public class Crawler {
 		val query = concat(
 				PREFIX_LIST,
 				"SELECT DISTINCT ?p {",
-				"   { ?x ?p                 ?y } UNION",
-				"   { ?p rdfs:subPropertyOf ?x } UNION",
-				"   { ?x rdfs:subPropertyOf ?p } UNION",
-				"   { ?p rdfs:domain        ?x } UNION",
-				"   { ?p rdfs:range         ?x }      ",
+				"     { ?x ?p                 ?y } UNION",
+				"     { ?p rdfs:subPropertyOf ?x } UNION",
+				"     { ?x rdfs:subPropertyOf ?p } UNION",
+				"     { ?p rdfs:domain        ?x } UNION",
+				"     { ?p rdfs:range         ?x }      ",
 
-				"   FILTER(",
-				"      !strstarts( str(?p), str(rdf:)  ) &&",
-				"      !strstarts( str(?p), str(rdfs:) )",
-				"   )",
+				"     FILTER(",
+				"          !strstarts( str(?p), str(rdf:)  ) &&",
+				"          !strstarts( str(?p), str(rdfs:) )",
+				"     )",
 				"}"
 				);
-				
 		
 		val results = QueryExecutionFactory.create(query, model).execSelect();
 		
@@ -236,26 +266,16 @@ public class Crawler {
 		
 		return executeAsConstruct(query);		
 	}
-	
-	private String concat(String... lines) {
-		val bulider = new StringBuilder();
 		
-		for ( final String l : lines ) {
-			bulider.append(l).append(LS);
-		}
-		
-		return bulider.toString();
-	}
-	
 	private Set<Resource> listClassIn(Model model) {
 		val query = concat(
 				PREFIX_LIST,
 				"SELECT DISTINCT ?c {",
-				"   { ?x rdf:type        ?c } UNION",
-				"   { ?c rdfs:subClassOf ?x } UNION",
-				"   { ?x rdfs:subClassOf ?c } UNION",
-				"   { ?x rdfs:domain     ?c } UNION",
-				"   { ?x rdfs:range      ?c }      ",
+				"     { ?x rdf:type        ?c } UNION",
+				"     { ?c rdfs:subClassOf ?x } UNION",
+				"     { ?x rdfs:subClassOf ?c } UNION",
+				"     { ?x rdfs:domain     ?c } UNION",
+				"     { ?x rdfs:range      ?c }      ",
 				"}"
 				);
 		
